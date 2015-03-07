@@ -7,7 +7,7 @@ output:
 
 
 ## Loading and preprocessing the data
-```{r}
+```{r message=FALSE}
 library(lubridate)
 library(dplyr)
 library(ggplot2)
