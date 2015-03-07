@@ -43,6 +43,14 @@ median(stepStats$countPerDay)
 
 ## What is the average daily activity pattern?
 
+```{r}
+intervalStats<-activity %>% 
+               filter(!is.na(steps)) %>%
+               group_by(interval) %>%
+               summarise(intervalAverage=mean(steps))
+    
+plot(intervalAverage~interval,data=intervalStats,type="l")
+```
 
 
 ## Imputing missing values
