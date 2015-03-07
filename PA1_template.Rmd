@@ -7,11 +7,38 @@ output:
 
 
 ## Loading and preprocessing the data
+```{r}
+library(lubridate)
+library(dplyr)
+library(ggplot2)
 
+unzip("activity.zip")
+activity <- read.csv("activity.csv",stringsAsFactors=FALSE)
+activity <- activity %>% mutate(date2=ymd(activity$date))
 
+```
 
 ## What is mean total number of steps taken per day?
 
+We create summary statistics from the interval data, first ignoring NA values
+```{r}
+stepStats<-activity %>% 
+           filter(!is.na(steps)) %>%
+           group_by(date) %>% 
+           summarise(countPerDay=sum(steps))
+```
+Using this summary we can get a feeling for the distribution of total number of steps per day using a histogram
+```{r}
+qplot(stepStats$countPerDay, binwidth=1000)
+```
+
+The distribution appears to be mostly symmetrical. This is backed up by the fact the mean number of steps each day and 
+median number of steps each day are very similar.
+
+```{r}
+mean(stepStats$countPerDay)
+median(stepStats$countPerDay)
+```
 
 
 ## What is the average daily activity pattern?
