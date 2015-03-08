@@ -1,21 +1,46 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
+title: 'Reproducible Research: Peer Assessment 1'
+output:
   html_document:
-    keep_md: true
+    self_contained: no
 ---
-
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='figure/', echo=TRUE)
+```
 
 ## Loading and preprocessing the data
+
+We first load a few library to make the work easier.
+
+Lubridate makes parsing and handlign dates and time easier.
+
+Dplyr makes querying and summarising data eaier.
+
+Data.table makes it easy to make lookups in a data set through the key functionality.
+
+Ggplot2 is used to make the graphics in this document.
+
 ```{r message=FALSE}
 library(lubridate)
 library(dplyr)
 library(ggplot2)
+library(data.table)
+```
 
+The raw activity data is loaded. A calculated column minutesFromMidnight is then added based on the interval name. This is done to make time series treatment of the data easier and plots of the data with correct spacing between points.
+
+```{r}
 unzip("activity.zip")
-activity <- read.csv("activity.csv",stringsAsFactors=FALSE)
-activity <- activity %>% mutate(date2=ymd(activity$date))
+activityRaw <- read.csv("activity.csv",stringsAsFactors=FALSE)
 
+intervalToMinutes<-function(interval)
+{
+  hourPart<-floor(interval/100)
+  minutePart<-interval-hourPart*100
+  hourPart*60+minutePart
+}
+activity <- activityRaw %>% 
+            mutate(date2=ymd(date),minutesFromMidnight=intervalToMinutes(interval))
 ```
 
 ## What is mean total number of steps taken per day?
@@ -43,18 +68,68 @@ median(stepStats$countPerDay)
 
 ## What is the average daily activity pattern?
 
+We can calculate the average step count by grouping together intervals with the same number of minutes from midnight 
+and calculating the average. We plot this as a time series graph where the time axis (x axis) has been scaled to hours from midnight 
+to make it easier to understand.
 ```{r}
 intervalStats<-activity %>% 
                filter(!is.na(steps)) %>%
-               group_by(interval) %>%
-               summarise(intervalAverage=mean(steps))
+               group_by(minutesFromMidnight) %>%
+               summarise(stepCount=mean(steps),intervalMedian=median(steps)) %>%
+               mutate(hourOfDay=minutesFromMidnight/60)
     
-plot(intervalAverage~interval,data=intervalStats,type="l")
+qplot(hourOfDay,stepCount,data=intervalStats,geom="line")+coord_cartesian(xlim = c(0, 24))
 ```
 
+As can be seen from the graph the interval that has the highes number of steps on the average over all days can be found by
+```{r}
+maxStepInt<-intervalStats[which.max(intervalStats$stepCount),]
+hr<-floor(maxStepInt$hourOfDay)
+mn<-maxStepInt$minutesFromMidnight-60*hr
+sprintf("%d:%d",hr,mn)
+```
 
 ## Imputing missing values
+
+There are missing values for the steps measurement in the activity data set
+```{r}
+summary(activity)
+```
+The number of observations with missing steps is `r sum(is.na(activity$steps))` which is a significant part of the observations or 
+`r 100*sum(is.na(activity$steps))/nrow(activity)`%
+
+We'll impute these missing values by replacing them with the average from the same interval in other days
+```{r}
+interval2Steps<-data.table(intervalStats)
+activityImputed<-activity
+missingIdx<-which(is.na(activity$steps))
+activityImputed[missingIdx,1]<-interval2Steps[minutesFromMidnight==activity[missingIdx,]$minutesFromMidnight]$intervalMedian
+```
+
+We can repeat the calculations from question 1 to see the influence on the distribution, mean and meadian of number of steps for each interval 
+```{r}
+stepStatsImputed<-activityImputed %>% 
+                  filter(!is.na(steps)) %>%
+                  group_by(date) %>% 
+                  summarise(countPerDay=sum(steps))
+
+list(rawMean=mean(stepStats$countPerDay), imputedMean=mean(stepStatsImputed$countPerDay))
+list(rawMedian=median(stepStats$countPerDay), imputedMedia=median(stepStatsImputed$countPerDay))
+
+qplot(stepStatsImputed$countPerDay, binwidth=1000)
+
+```
 
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+weekStats <-     activityImputed %>% 
+                 mutate(isWeekday=as.factor(ifelse((wday(date2)==1)|(wday(date2)==7),"weekend","weekdays"))) %>%
+                 group_by(minutesFromMidnight, isWeekday) %>%
+                 summarise(steps=mean(steps)) %>%
+                 mutate(hourOfDay=minutesFromMidnight/60)
+ggplot(weekStats,aes(hourOfDay,steps))+geom_line()+facet_grid(isWeekday~.)+coord_cartesian(xlim = c(0, 24)) 
+```
+
