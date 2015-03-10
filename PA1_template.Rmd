@@ -52,11 +52,14 @@ stepStats<-activity %>%
            group_by(date) %>% 
            summarise(countPerDay=sum(steps))
 ```
+
+### Histogram of  total number of steps taken each day
 Using this summary we can get a feeling for the distribution of total number of steps per day using a histogram
 ```{r}
-qplot(stepStats$countPerDay, binwidth=1000)
+qplot(stepStats$countPerDay, binwidth=2000,main="Steps per day",xlab="Step count",ylab="Number of days")
 ```
 
+### The mean and median number of steps taken each day
 The distribution appears to be mostly symmetrical. This is backed up by the fact the mean number of steps each day and 
 median number of steps each day are very similar.
 
@@ -77,11 +80,18 @@ intervalStats<-activity %>%
                group_by(minutesFromMidnight) %>%
                summarise(stepCount=mean(steps),intervalMedian=median(steps)) %>%
                mutate(hourOfDay=minutesFromMidnight/60)
-    
+```
+
+### Time series plot of the average number of steps taken versus the 5-minute intervals
+
+```{r}      
 qplot(hourOfDay,stepCount,data=intervalStats,geom="line")+coord_cartesian(xlim = c(0, 24))
 ```
 
+### 5-minute interval that, on average, contains the maximum number of steps
+
 As can be seen from the graph the interval that has the highes number of steps on the average over all days can be found by
+
 ```{r}
 maxStepInt<-intervalStats[which.max(intervalStats$stepCount),]
 hr<-floor(maxStepInt$hourOfDay)
@@ -98,13 +108,17 @@ summary(activity)
 The number of observations with missing steps is `r sum(is.na(activity$steps))` which is a significant part of the observations or 
 `r 100*sum(is.na(activity$steps))/nrow(activity)`%
 
-We'll impute these missing values by replacing them with the average from the same interval in other days
+### Strategy for dealing with missing data
+
+We'll impute these missing values by replacing them with the median from the same interval in other days
 ```{r}
 interval2Steps<-data.table(intervalStats)
 activityImputed<-activity
 missingIdx<-which(is.na(activity$steps))
 activityImputed[missingIdx,1]<-interval2Steps[minutesFromMidnight==activity[missingIdx,]$minutesFromMidnight]$intervalMedian
 ```
+
+### Influence of imputing data
 
 We can repeat the calculations from question 1 to see the influence on the distribution, mean and meadian of number of steps for each interval 
 ```{r}
@@ -116,13 +130,14 @@ stepStatsImputed<-activityImputed %>%
 list(rawMean=mean(stepStats$countPerDay), imputedMean=mean(stepStatsImputed$countPerDay))
 list(rawMedian=median(stepStats$countPerDay), imputedMedia=median(stepStatsImputed$countPerDay))
 
-qplot(stepStatsImputed$countPerDay, binwidth=1000)
+qplot(stepStatsImputed$countPerDay, binwidth=2000,,main="Steps per day when imputing missing datas",xlab="Step count",ylab="Number of days")
 
 ```
 
 
-
 ## Are there differences in activity patterns between weekdays and weekends?
+
+It is easy to investigate the difference in activity on weekdays and weekends by adding a factor variable to the dataset indicating if a given day is a "weekend" or "weekday". The wday() function from lubridate helps with that. We can then group by this new factor and summarise the mean number of step for each 5-minute interval on weekends and weekdays.
 
 ```{r}
 weekStats <-     activityImputed %>% 
@@ -130,6 +145,13 @@ weekStats <-     activityImputed %>%
                  group_by(minutesFromMidnight, isWeekday) %>%
                  summarise(steps=mean(steps)) %>%
                  mutate(hourOfDay=minutesFromMidnight/60)
+```
+
+### Comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+We plot this on a two panel plot for easy comparison
+
+```{r}
 ggplot(weekStats,aes(hourOfDay,steps))+geom_line()+facet_grid(isWeekday~.)+coord_cartesian(xlim = c(0, 24)) 
 ```
 
